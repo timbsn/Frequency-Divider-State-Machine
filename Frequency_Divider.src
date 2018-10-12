@@ -1,0 +1,394 @@
+;Program: Frequency Divider.src 
+;Originally developed for a MicroChip Pic 16c84 Microcontroller
+;This program accepts an operand from a Parallax Basic Stamp that is stored in EEPROM.
+;No operand is available in eeprom on the first boot.
+;This received operand is used as a percentage multiplier (0-100%) that determines
+;the stepped (frequency divided) output frequency to a stepper motor.
+;There are up to 12 PICs in the system, each with a unique, hardwired identifier.
+;Communications from Stamp to PIC occurs by the Stamp signaling all PICs on rts (rb,0), 
+;the PICs sending an acknowledge on rtt (rb.1), and then a BCD code 
+;being sent to the PIC serially on serial_in (rb.2). If the PICs 
+;IDvalue and the BCD code match, the PIC writes the new operand to its EEPROM.
+;The operand determines the sequence of the code placed into an array.
+;The larger the operand, the more bits in the sequence (array). 
+;The encoder drives the state machine to step through the array sequence,
+;determining if an output signal should occur based on each encoder input.
+;In other words, if the 2-word array contains a 1, a 35us pulse is clocked out, 
+;otherwise thew program waits for the encoder to go Lo, and then returns to hold.
+;If halfdens (rb.3) goes LO, the output frequency is divided in half. 
+
+;Device setup(16c84)
+           Device  pic16c84,xt_osc,wdt_off,pwrt_off,protect_off
+
+
+rts         = rb.0      ;request to send from stamp11(pin6)tie high
+encoder     = rb.6      ;assign label encoder to rb.6(pin12)
+stepout     = rb.7      ;assign label stepout to rb.7(pin13)
+IDvalue     = ra        ;port a is labeled IDvalue
+bit_K       = 102       ;Change this value for desired baudrate
+half_bit    = bit_K/2   ;as shown in table.
+serial_in   = rb.2      ;pin8
+rtt         = rb.1      ;pin7
+halfdens    = rb.3      ;pin9 for variable density (tie hi)
+
+
+                  org 0Ch         
+                       
+Stepdel    ds     1  ;assign space for counter for timed step
+msbh       ds     1  ;most sig digit highbyte for step sequence
+msbl       ds     1  ;most sig digit lowbyte for step sequence
+lsbh       ds     1  ;least sig digit highbyte for step sequence
+lsbl       ds     1  ;least sig digit lowbyte for step sequence
+msdcnt     ds     1  ;most sig digit index counter
+lsdcnt     ds     1  ;least sig digit index counter
+qualify    ds     1  ;masked value of ra (IDvalue)
+densbyte1  ds     1  ;first byte of density value MSB (1 or 0)
+densbyte2  ds     1  ;second byte of density value SB (0 to 9)
+densbyte3  ds     1  ;third byte of density value LSB (0 to 9)
+tempdens1  ds     1  ;variables used by ser_in
+tempdens2  ds     1
+tempdens3  ds     1
+qualifier  ds     1 
+delay_cntr ds     1  ;Counter for serial delay routines
+bit_cntr   ds     1  ;Number of received bits
+rcv_byte   ds     1  ;The received byte
+ 
+
+
+                  org  0
+
+start             mov  !rb, #01111101b     ;make rb.7&1 output
+                  mov  !ra, #11111111b     ;make ra input
+                  mov  msdcnt,#0h          ;set mscnt=0
+                  mov  lsdcnt,#0h          ;set lsdcnt=0
+            ;*****to be used by ser_in routine (ID no.)*********
+                  mov  qualify,IDvalue     ;move ra into var
+                  and  qualify,#00001111b  ;mask all but ID bits
+                 
+            ;***********Read divider operand values from EEPROM**********
+:rdprom           mov  EEADR,#00h        ;select 1st EEPROM Locatn
+                  setb RP0               ;select Register Page 1
+                  setb EECON1.0          ;start read cycle
+                  clrb RP0               ;select Register Page 0
+                  mov  densbyte1,EEDATA  ;put contents in densbyte1
+                  mov  EEADR,#01h        ;select 01h EEPROM Locatn
+                  setb RP0               ;select Register Page 1
+                  setb EECON1.0          ;start read cycle
+                  clrb RP0               ;select Register Page 0
+                  mov  densbyte2,EEDATA  ;put contents in densbyte2
+                  mov  EEADR,#02h        ;select 02h EEPROM Locatn
+                  setb RP0               ;select Register Page 1
+                  setb EECON1.0          ;start read cycle
+                  clrb RP0               ;select Register Page 0
+                  mov  densbyte3,EEDATA  ;put contents in densbyte3
+                  clrb rtt
+            ;*******;takes values in densbytex and loads step seq                
+:load_step_seq    cje  densbyte1,#00000001b,:load10h ;is it 100%
+                  cje  densbyte2,#00001001b,:load9h ;is SB =09_%?
+                  cje  densbyte2,#00001000b,:load8h ;is SB =08_%?
+                  cje  densbyte2,#00000111b,:load7h  
+                  cje  densbyte2,#00000110b,:load6h
+                  cje  densbyte2,#00000101b,:load5h
+                  cje  densbyte2,#00000100b,:load4h
+                  cje  densbyte2,#00000011b,:load3h
+                  cje  densbyte2,#00000010b,:load2h
+                  cje  densbyte2,#00000001b,:load1h
+                  goto :load0h                       ;SB=0 
+:byte3            cje  densbyte3,#00001001b,:load9l  ;is LSB=0_9%?
+                  cje  densbyte3,#00001000b,:load8l
+                  cje  densbyte3,#00000111b,:load7l
+                  cje  densbyte3,#00000110b,:load6l
+                  cje  densbyte3,#00000101b,:load5l
+                  cje  densbyte3,#00000100b,:load4l
+                  cje  densbyte3,#00000011b,:load3l
+                  cje  densbyte3,#00000010b,:load2l
+                  cje  densbyte3,#00000001b,:load1l
+                  goto :load0l                       ;lsb=0
+:load10h          mov  msbh,#11111111b  ;step seq for 100%
+                  mov  msbl,#10000000b
+                  mov  lsbh,#11111111b 
+                  mov  lsbl,#10000000b 
+                  goto :hold
+:load9h           mov  msbh,#11111111b  ;step seq for 9
+                  mov  msbl,#10000000b
+                  goto :byte3
+:load8h           mov  msbh,#11110111b
+                  mov  msbl,#10000000b
+                  goto :byte3
+:load7h           mov  msbh,#01111011b
+                  mov  msbl,#10000000b
+                  goto :byte3
+:load6h           mov  msbh,#01110011b
+                  mov  msbl,#10000000b
+                  goto :byte3
+:load5h           mov  msbh,#01011010b
+                  mov  msbl,#10000000b
+                  goto :byte3
+:load4h           mov  msbh,#01010010b
+                  mov  msbl,#10000000b
+                  goto :byte3
+:load3h           mov  msbh,#00101001b
+                  mov  msbl,#00000000b
+                  goto :byte3
+:load2h           mov  msbh,#00100001b
+                  mov  msbl,#00000000b
+                  goto :byte3
+:load1h           mov  msbh,#00001000b
+                  mov  msbl,#00000000b
+                  goto :byte3
+:load0h           mov  msbh,#00000000b
+                  mov  msbl,#00000000b
+                  goto :byte3
+:load9l           mov  lsbh,#11111111b
+                  mov  lsbl,#10000000b
+                  goto :hold
+:load8l           mov  lsbh,#11110111b
+                  mov  lsbl,#10000000b
+                  goto :hold
+:load7l           mov  lsbh,#01111011b
+                  mov  lsbl,#10000000b
+                  goto :hold
+:load6l           mov  lsbh,#01110011b
+                  mov  lsbl,#10000000b
+                  goto :hold
+:load5l           mov  lsbh,#01011010b
+                  mov  lsbl,#10000000b
+                  goto :hold
+:load4l           mov  lsbh,#01010010b
+                  mov  lsbl,#10000000b
+                  goto :hold
+:load3l           mov  lsbh,#00101001b
+                  mov  lsbl,#00000000b
+                  goto :hold
+:load2l           mov  lsbh,#00100001b
+                  mov  lsbl,#00000000b
+                  goto :hold
+:load1l           mov  lsbh,#00001000b
+                  mov  lsbl,#00000000b
+                  goto :hold
+:load0l           mov  lsbh,#00000000b
+                  mov  lsbl,#00000000b
+
+
+;*****************main routine**************************************
+:hold             jnb  rts,:ser_in         ;rts tied high 
+                  jb   halfdens,:hunpct    ;if pin9 Hi jmp
+                  jnb  encoder,:hold       ;wait for enc=1
+                  nop                      ;main program loop
+                  nop
+                  inc msdcnt              ;msdcnt + 1
+                  cje  msdcnt,#00000001b,:msdcnt1    ;is msdcnt 1?
+                  cje  msdcnt,#00000010b,:msdcnt2    ;is msdcnt 2? 
+                  cje  msdcnt,#00000011b,:msdcnt3    ;is msdcnt 3? 
+                  cje  msdcnt,#00000100b,:msdcnt4    ;is msdcnt 4? 
+                  cje  msdcnt,#00000101b,:msdcnt5    ;is msdcnt 5?         
+                  cje  msdcnt,#00000110b,:msdcnt6    ;is msdcnt 6? 
+                  cje  msdcnt,#00000111b,:msdcnt7    ;is msdcnt 7? 
+                  cje  msdcnt,#00001000b,:msdcnt8    ;is msdcnt 8? 
+                  cje  msdcnt,#00001001b,:msdcnt9    ;is msdcnt 9? 
+                  nop
+                  mov  msdcnt,#0h                    ;clear msdcnt
+                  inc  lsdcnt                        ;lsdcnt+1
+                  cje  lsdcnt,#00000001b,:lsdcnt1    ;is lsdcnt 1?
+                  cje  lsdcnt,#00000010b,:lsdcnt2    ;is lsdcnt 2?
+                  cje  lsdcnt,#00000011b,:lsdcnt3    ;is lsdcnt 3?
+                  cje  lsdcnt,#00000100b,:lsdcnt4    ;is lsdcnt 4?
+                  cje  lsdcnt,#00000101b,:lsdcnt5    ;is lsdcnt 5?
+                  cje  lsdcnt,#00000110b,:lsdcnt6    ;is lsdcnt 6?
+                  cje  lsdcnt,#00000111b,:lsdcnt7    ;is lsdcnt 7?
+                  cje  lsdcnt,#00001000b,:lsdcnt8    ;is lsdcnt 8?
+                  cje  lsdcnt,#00001001b,:lsdcnt9    ;is lsdcnt 9?
+                  mov  lsdcnt,#0h                    ;clear lsdcnt
+                  goto :hold2                        ;wait encdr=0
+                  nop
+:msdcnt1          jb   msbh.7,:step                  ;is arrbit=1?  
+                  goto :hold2                        ;no, wait enc
+:msdcnt2          jb   msbh.6,:step                 
+                  goto :hold2
+:msdcnt3          jb   msbh.5,:step                 
+                  goto :hold2
+:msdcnt4          jb   msbh.4,:step                 
+                  goto :hold2
+:msdcnt5          jb   msbh.3,:step                 
+                  goto :hold2
+:msdcnt6          jb   msbh.2,:step                 
+                  goto :hold2
+:msdcnt7          jb   msbh.1,:step                 
+                  goto :hold2
+:msdcnt8          jb   msbh.0,:step                 
+                  goto :hold2
+:msdcnt9          jb   msbl.7,:step                 
+                  goto :hold2
+:lsdcnt1          jb   lsbh.7,:step                  ;is arrbit=1?
+                  goto :hold2                        ;no, wait enc
+:lsdcnt2          jb   lsbh.6,:step
+                  goto :hold2
+:lsdcnt3          jb   lsbh.5,:step
+                  goto :hold2
+:lsdcnt4          jb   lsbh.4,:step
+                  goto :hold2 
+:lsdcnt5          jb   lsbh.3,:step
+                  goto :hold2 
+:lsdcnt6          jb   lsbh.2,:step
+                  goto :hold2
+:lsdcnt7          jb   lsbh.1,:step
+                  goto :hold2 
+:lsdcnt8          jb   lsbh.0,:step
+                  goto :hold2
+:lsdcnt9          jb   lsbl.7,:step
+                  goto :hold2                                                                                                                                                                                 
+                     
+
+
+
+ ;************************pulse output**********************
+:step             setb stepout             ;set bit7 hi p13
+                  mov  stepdel,#08h        ;initialize countr
+:del              dec  stepdel             ;35us
+                  jnz  :del                ;jmp til stepdel=0
+                  clrb stepout             ;toggle pin13
+:hold2            jnb  rts,:ser_in         ;check rts
+                  jb   halfdens,:hunpct    ;is pin9 HI
+                  jb   encoder,:hold2      ;wait for enc=0
+                  goto :hold               ;return
+;*********************pulse output 100%*********************
+:hunpct           nop                      ;routine tostep 100% 
+:hold3            jnb  rts,:ser_in         ;check rts
+                  jnb  halfdens,:hold
+                  jnb  encoder,:hold3
+                  setb stepout             ;set bit7 high p13
+                  mov  stepdel,#08h        ;initialize countr
+:del2             dec  stepdel             ;35us
+                  jnz  :del2               ;jmp til stepdel=0
+                  clrb stepout             ;toggle pin13
+:hold4            jnb  rts,:ser_in         ;check rts
+                  jnb  halfdens,:hold
+                  jb   encoder,:hold4      ;wait for enc=0
+                  goto :hold3              ;return
+;***********************************************************
+;******Ser_in Routine (temporarily outputs high when rts low)
+
+
+:ser_in            
+        setb rtt                ;set rtt to a 1
+        call get_byte
+        mov qualifier,rcv_byte    ;save byte in qualifier varible
+        call get_byte
+        mov tempdens1,rcv_byte    ;save byte in 1st density byte var	
+        call get_byte
+        mov tempdens2,rcv_byte    ;save byte in 2nd density byte var
+        call get_byte
+        mov tempdens3,rcv_byte    ;save byte in 3rd density byte var
+        clrb rtt                  ;turn off rtt
+        cje  qualify,qualifier,:writeprom   ;chk qualifier
+        goto :load_step_seq                 ;return without accepting
+                                            ;new percentage
+
+                  ;*****write new percentage to eeprom
+:writeprom        mov  EEADR,#00h        ;select 1st EEPROM Locatn
+                  mov  EEDATA,tempdens1  ;store densbyte1
+                  setb RP0               ;select Register Page 1
+                  setb EECON1.2          ;set write enable bit
+                  mov  EECON2,#55h       ;Write special byte#1
+                  mov  EECON2,#10101010b ;Write special byte#2
+                  setb EECON1.1          ;start write cycle
+                  jb   EECON1.1,$        ;wait until write bit clears
+                  clrb RP0               ;select register page 0
+                  mov  EEADR,#01h        ;select 01h EEPROM Locatn
+                  mov  EEDATA,tempdens2  ;store densbyte2
+                  setb RP0               ;select Register Page 1
+                  setb EECON1.2          ;set write enable bit
+                  mov  EECON2,#55h       ;Write special byte#1
+                  mov  EECON2,#10101010b ;Write special byte#2
+                  setb EECON1.1          ;start write cycle
+                  jb   EECON1.1,$        ;wait until write bit clears
+                  clrb RP0               ;select register page 0
+                  mov  EEADR,#02h        ;select 02h EEPROM Locatn
+                  mov  EEDATA,tempdens3  ;store densbyte3
+                  setb RP0               ;select Register Page 1
+                  setb EECON1.2          ;set write enable bit
+                  mov  EECON2,#55h       ;Write special byte#1
+                  mov  EECON2,#10101010b ;Write special byte#2
+                  setb EECON1.1          ;start write cycle
+                  jb   EECON1.1,$        ;wait til write bit clears
+                  clrb RP0               ;select register page 0
+         
+                  ;**************************************************
+                  ;*******prepare to return with new percentage
+                  mov  densbyte1,tempdens1
+                  mov  densbyte2,tempdens2
+                  mov  densbyte3,tempdens3
+                  goto :load_step_seq    ;return & load steppattern
+
+;
+
+get_byte
+
+:start_bit  sb serial_in      ;Detect start bit.
+
+        jmp :start_bit         ;No start bit yet? Keep watching.
+        call    start_delay    ;Wait one-half bit time to middle
+                               ;of the start bit.
+
+        jnb   Serial_in,:start_bit
+
+                               ;If start bit still good,continue.
+                               ; Otherwise, resume waiting.
+
+        mov bit_cntr, #8       ;Set counter to receive 8 databits
+        clr rcv_byte           ;Clear receive byte to get ready
+                               ;for new data.
+
+:receive    call    bit_delay  ;Wait one bit time.
+
+        movb    c,/Serial_in   ;Put the data bit into carry.
+
+        rr  rcv_byte           ;Rotate  carry bit into the receive
+                               ;byte.
+	  djnz bit_cntr,:receive	
+                               ;Not eight bits yet? Get next bit.
+
+        call bit_delay         ;Wait for stop bit.
+
+        ret
+
+; This delay loop takes four instruction 
+;cycles per loop, plus eight
+; instruction cycles for other operations 
+;(call, mov, the final djnz, and ret).
+; These extra cycles become significant
+; at higher baud rates. The values for
+; bit_K in the table take the time required
+; for additional instructions into
+; account.   
+
+bit_delay	mov	delay_cntr,#bit_K 
+:loop		nop
+		djnz	delay_cntr, :loop
+		ret	
+
+; This delay loop is identical to bit_delay 
+;above, but provides half the delay
+; time. 
+
+start_delay	mov	delay_cntr,#half_bit 
+:loop2	nop
+		djnz	delay_cntr, :loop2
+		ret
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
