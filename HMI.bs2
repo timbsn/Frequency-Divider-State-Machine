@@ -1,4 +1,4 @@
-'This program was written for a Parallax Basic Stamp 2 to interface with a 4-button,
+'This program was written for a Parallax Basic Stamp 2 to interface with a 6-button,
 '4-row LCD display via serial communications. The Stamp also interfaces with up to 
 '12 PIC 16C84 microcontrollers using a proprietary communications scheme
 'consisting of a RTS and RTT handshake followed by transmission of serial data 
