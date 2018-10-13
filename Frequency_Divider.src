@@ -1,16 +1,16 @@
 ;Program: Frequency Divider.src 
-;Originally developed for a MicroChip Pic 16c84 Microcontroller
-;This program accepts an operand from a Parallax Basic Stamp that is stored in EEPROM.
-;No operand is available in eeprom on the first boot.
-;This received operand is used as a percentage multiplier (0-100%) that determines
-;the stepped (frequency divided) output frequency to a stepper motor.
+;This program permits MicroChip Pic 16c84 microcontrollers 
+;to act as frequency dividers, that ultimately drive stepper motors.
+;A Parallax Basic Stamp sends the divider percentage operand (0-100%);
+;the PIC stores this value in EEPROM. No operand is available in EEPROM
+;on the first boot. 
 ;There are up to 12 PICs in the system, each with a unique, hardwired identifier.
 ;Communications from Stamp to PIC occurs by the Stamp signaling all PICs on rts (rb,0), 
 ;the PICs sending an acknowledge on rtt (rb.1), and then a BCD code 
 ;being sent to the PIC serially on serial_in (rb.2). If the PICs 
 ;IDvalue and the BCD code match, the PIC writes the new operand to its EEPROM.
 ;The operand determines the sequence of the code placed into an array.
-;The larger the operand, the more bits in the sequence (array). 
+;The larger the operand, the more Hi bits in the sequence. 
 ;The encoder drives the state machine to step through the array sequence,
 ;determining if an output signal should occur based on each encoder input.
 ;In other words, if the 2-word array contains a 1, a 35us pulse is clocked out, 
