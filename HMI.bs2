@@ -1,9 +1,9 @@
-'This program was written for a Parallax Basic Stamp 2 to interface with a 6-button,
+'This program allows a Parallax Basic Stamp 2 to interface with a 6-button,
 '4-row LCD display via serial communications. The Stamp also interfaces with up to 
 '12 PIC 16C84 microcontrollers using a proprietary communications scheme
-'consisting of a RTS and RTT handshake followed by transmission of serial data 
-'on a serial data bus. This system controlled a set of up to 12 stepper drives that 
-'controlled a knitting machine head. Any entered data/density values are stored in
+'consisting of an RTS and RTT handshake followed by transmission of serial data 
+'on a serial data bus. This system controls a set of up to 12 stepper drives that 
+'control a knitting machine head. Any entered data/density values are stored in
 'PROM
 '***********************************************************************
 'INITIALIZE VARIABLES
