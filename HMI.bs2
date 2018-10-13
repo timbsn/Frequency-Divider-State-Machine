@@ -277,7 +277,7 @@ serialrtn:		serout 15,396+$4000,[headno]  	'send qualifier to pics
         			serout 15,396+$4000,[densbyte3]
 			high 13		          		'turn off RTS line
 			low 15					'turn off DATA led
-                  		if headno=13 then jmp6       	'if changing half density,
+                  		if headno=13 then jmp6       	'if changing half density
 			return                        		
 jmp6:            		headno=maxint                   'display variable density
                   		return
