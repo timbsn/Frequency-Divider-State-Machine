@@ -29,38 +29,38 @@ flashbit=0              			'default to display non-flashing data
 densityvalue = 0
 FLB=$00
 dirs=%1011000000000000
-Low 15					'default DATA led off
+Low 15						'default DATA led off
 High 13	           				'default Request to Send
 High  6                				'dip MCLR on pics
 
 '**************************************************************
 'DETERMINE IF 8 OR 12 FEED MACHINE BY CHECKING JUMPER
             		if in11=0 then twelvefd       'is jumper made?      
-           		maxint=9                             'no, then 8 feed
+           		maxint=9                      'no, then 8 feed
            		goto begin                         
-twelvefd:   	maxint=13                           'yes, then 12 feed
+twelvefd:   	maxint=13                             'yes, then 12 feed
 '***************************************************************
 'initialize system
 begin:      	pause 1000
 		low 6
 		gosub clrscrn		
-		gosub GetDataProm             'get data for headno.=?
-		gosub displaydata                 'display data subroutine
+		gosub GetDataProm            		'get data for head number x
+		gosub displaydata                	'display data subroutine
 'main routine—jumps to subroutines on any button push*********************************************
 mainloop:      	cs=$A0+FLB							'toggle head and density				serout 12,84+$4000,[$02,$00,$A0,FLB,cs]				'general status control
 		serin 10,84+$4000,[STX,button_stat,display_stat,CS]		'get button status
-		if button_stat.bit0 = 1 then headup					'is head up pushed?
+		if button_stat.bit0 = 1 then headup				'is head up pushed?
 		if button_stat.bit1 = 1 then headdwn				'is head down pushed?
-		if button_stat.bit2 = 1 then Enter					'is Enter pushed?
-		if button_stat.bit3 = 1 then densup					'is density up pushed?
+		if button_stat.bit2 = 1 then Enter				'is Enter pushed?
+		if button_stat.bit3 = 1 then densup				'is density up pushed?
 		if button_stat.bit4 = 1 then densdwn				'is density down pushed?
      		if in0=0 then running
 		goto mainloop
 'head up subroutine********************************
 headup:	flashBit=0
 		FLB=$00
-           		if headno < maxint then jmp1        'increment headno if less than
-            		headno=0                             	'maxint, if maxint rollover to 1
+           		if headno < maxint then jmp1         'increment headno if less than
+            		headno=0                             'maxint, if maxint rollover to 1
 jmp1:		headno=headno+1
             		gosub GetDataProm                     
             		gosub displaydata                   	
@@ -96,9 +96,9 @@ densdwn:	flashbit=1                          			'flash data in densityvalue
 
 'enter button subroutine************************************************************    
 Enter:		serout 12,84+$4000,[$02,$00,$A0,$01,$A1]	'turn on red light
-            		gosub writeDataProm				'write Data to Prom
-            		gosub writetopics                 			'write Data to pics
-            		flashbit=0                        				'Stop flashing data
+            		gosub writeDataProm			'write Data to Prom
+            		gosub writetopics                 	'write Data to pics
+            		flashbit=0                        	'stop flashing data
 		FLB=$00
 		gosub displaydata
 		pause 500
@@ -106,7 +106,7 @@ Enter:		serout 12,84+$4000,[$02,$00,$A0,$01,$A1]	'turn on red light
 
 'get data from PROM**************************************************************
 GetDataProm:   	if headno=maxint then H13
-               	if headno=1  then H1       				'Determine head number
+               	if headno=1  then H1       			'Determine head number
               		if headno=2  then H2                                          
                	if headno=3  then H3               
                	if headno=4  then H4
@@ -119,7 +119,7 @@ GetDataProm:   	if headno=maxint then H13
                	if headno=11 then H11
                	if headno=12 then H12
 H1:  read 1,densityvalue                   			'Read eeprom address corresponding
-     return                               				'to headno, put data into densityval
+     return                               			'to headno, put data into densityval
 H2:  read 2,densityvalue
      return
 H3:  read 3,densityvalue
@@ -161,7 +161,7 @@ writeDataProm: if headno=maxint then HD13
                if headno=12 then HD12
                            
 HD1: write 1,densityvalue                   			'write data in densityvalue to eeprom
-     return                               				'address corresponding to headno
+     return                               			'address corresponding to headno
 HD2:  write 2,densityvalue
      return
 HD3:  write 3,densityvalue
@@ -188,7 +188,7 @@ HD13: write 13,densityvalue
      return
 'display data on LCD screen****************************************************************************
 displaydata:		if flashbit=1 then flash  'displays headno and densityvalue retrieved from GetDataProm
-              			if headno = maxint then dens
+              		if headno = maxint then dens
 			HN.LOWNIB=headno//10
 			HN.HIGHNIB=headno/10                 
 			cs=$A1+$01+$02+HN
@@ -230,7 +230,7 @@ dens:			FLB=$00
 			gosub check
 			return
 
-flashdens:		FLB=$02					'half density signal to flashing light
+flashdens:		FLB=$02						'half density signal to flashing light
 			cs=$A0+FLB
 			serout 12,84+$4000,[$02,$00,$A0,FLB,cs]		'turns on flashing yellow light
 			gosub check
@@ -249,7 +249,7 @@ running:			gosub clrscrn
 			cs=$A0+FLB
 			serout 12,84+$4000,[$02,$00,$A0,FLB,cs]				'turns on green light
 			gosub check
-			serout 12,84+$4000,[$02,$00,$A1,$01,$03,$00,$00,$00,$00,$A5] 'display "running" message
+			serout 12,84+$4000,[$02,$00,$A1,$01,$03,$00,$00,$00,$00,$A5] 	'display "running" message
 			gosub check
 			if in0=0 then running
 			flashbit=0
@@ -267,7 +267,7 @@ writetopics:		low 13                      		'turn on RTS line
 			densbyte3=densityvalue//10
 			
 hold5:			if in14=1 then hold5    		'wait for RTT confirmation from pics
-	           		if headno=maxint then jmp5           'change qualifier for halfdens
+	           		if headno=maxint then jmp5      'change qualifier for halfdens
                   		goto serialrtn			' to 13
 jmp5:            		headno = 13        
 
@@ -276,10 +276,10 @@ serialrtn:		serout 15,396+$4000,[headno]  	'send qualifier to pics
 			serout 15,396+$4000,[densbyte2]
         			serout 15,396+$4000,[densbyte3]
 			high 13		          		'turn off RTS line
-			low 15				'turn off DATA led
-                  		if headno=13 then jmp6       	'if changing half density,
+			low 15					'turn off DATA led
+                  		if headno=13 then jmp6       	'if changing half density
 			return                        		
-jmp6:            		headno=maxint                   	'display variable density
+jmp6:            		headno=maxint                   'display variable density
                   		return
 
 check:			serin 10,84+$4000,[b11]
@@ -287,11 +287,11 @@ check:			serin 10,84+$4000,[b11]
 
 clrscrn:			serout 12,84+$4000,[$02,$00,$A1,$00,$06,$00,$00,$00,$00,$A7]	'clr line 1
 			gosub check
-			serout 12,84+$4000,[$02,$00,$A1,$01,$06,$00,$00,$00,$00,$A8]	'clr line 2
+			serout 12,84+$4000,[$02,$00,$A1,$01,$06,$00,$00,$00,$00,$A8]		'clr line 2
 			gosub check
-			serout 12,84+$4000,[$02,$00,$A1,$02,$06,$00,$00,$00,$00,$A9]	'clr line 3
+			serout 12,84+$4000,[$02,$00,$A1,$02,$06,$00,$00,$00,$00,$A9]		'clr line 3
 			gosub check
-			serout 12,84+$4000,[$02,$00,$A1,$03,$06,$00,$00,$00,$00,$AA]	'clr line 4
+			serout 12,84+$4000,[$02,$00,$A1,$03,$06,$00,$00,$00,$00,$AA]		'clr line 4
 			gosub check
 			return
 
