@@ -171,12 +171,12 @@ start             mov  !rb, #01111101b     ;make rb.7&1 output
 
 
 ;*****************main routine**************************************
-:hold             jnb  rts,:ser_in         ;rts tied high 
-                  jb   halfdens,:hunpct    ;if pin9 Hi jmp
-                  jnb  encoder,:hold       ;wait for enc=1
-                  nop                      ;main program loop
+:hold             jnb  rts,:ser_in         	;rts tied high 
+                  jb   halfdens,:hunpct    	;if pin9 Hi jmp
+                  jnb  encoder,:hold       	;wait for enc=1
+                  nop                      	;main program loop
                   nop
-                  inc msdcnt              ;msdcnt + 1
+                  inc msdcnt              	     ;msdcnt + 1
                   cje  msdcnt,#00000001b,:msdcnt1    ;is msdcnt 1?
                   cje  msdcnt,#00000010b,:msdcnt2    ;is msdcnt 2? 
                   cje  msdcnt,#00000011b,:msdcnt3    ;is msdcnt 3? 
@@ -270,7 +270,7 @@ start             mov  !rb, #01111101b     ;make rb.7&1 output
 
 
 :ser_in            
-        setb rtt                ;set rtt to a 1
+        setb rtt                  ;set rtt Hi
         call get_byte
         mov qualifier,rcv_byte    ;save byte in qualifier varible
         call get_byte
@@ -318,9 +318,7 @@ start             mov  !rb, #01111101b     ;make rb.7&1 output
                   mov  densbyte1,tempdens1
                   mov  densbyte2,tempdens2
                   mov  densbyte3,tempdens3
-                  goto :load_step_seq    ;return & load steppattern
-
-;
+                  goto :load_step_seq    	;return & load steppattern
 
 get_byte
 
