@@ -69,31 +69,29 @@ jmp1:		headno=headno+1
 'head down subroutine******************************
 headdwn:	flashBit=0
 		FLB=$00
-            		if headno > 1 then jmp2            		'decrement headno if more than
-            		headno=maxint+1                       		'0, if 0 rollover to maxint
+            		if headno > 1 then jmp2            	'decrement headno if more than
+            		headno=maxint+1                       	'0, if 0 rollover to maxint
 jmp2:		headno=headno-1
             		gosub GetDataProm
             		gosub displaydata                   	
 		pause 200
            		goto mainloop
 'increment density subroutine*************************
-densup:		flashbit=1                          			'flash data in densityvalue
+densup:		flashbit=1                          		'flash data in densityvalue
 		FLB=$02
-            		if densityvalue=100 then mainloop        	'increment digit specified
+            		if densityvalue=100 then mainloop       'increment digit specified
             		densityvalue=densityvalue + 1
             		gosub displaydata                   	
 		pause 200
             		goto mainloop
-
 'decrement density subroutine*************************
-densdwn:	flashbit=1                          			'flash data in densityvalue
+densdwn:	flashbit=1                          		'flash data in densityvalue
 		FLB=$02
-            		if densityvalue=0 then mainloop             	'decrement digit specified
+            		if densityvalue=0 then mainloop         'decrement digit specified
             		densityvalue=densityvalue-1
             		gosub displaydata                   	
 		pause 200
             		goto mainloop
-
 'enter button subroutine************************************************************    
 Enter:		serout 12,84+$4000,[$02,$00,$A0,$01,$A1]	'turn on red light
             		gosub writeDataProm			'write Data to Prom
@@ -103,7 +101,6 @@ Enter:		serout 12,84+$4000,[$02,$00,$A0,$01,$A1]	'turn on red light
 		gosub displaydata
 		pause 500
 		goto mainloop
-
 'get data from PROM**************************************************************
 GetDataProm:   	if headno=maxint then H13
                	if headno=1  then H1       			'Determine head number
