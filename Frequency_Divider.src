@@ -14,7 +14,7 @@
 ;The encoder drives the state machine to step through the array sequence,
 ;determining if an output signal should occur based on each encoder input.
 ;In other words, if the 2-word array contains a 1, a 35us pulse is clocked out, 
-;otherwise thew program waits for the encoder to go Lo, and then returns to hold.
+;otherwise the program waits for the encoder to go Lo, and then returns to hold.
 ;If halfdens (rb.3) goes LO, the output frequency is divided in half. 
 
 ;Device setup(16c84)
