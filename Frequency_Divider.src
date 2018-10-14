@@ -1,6 +1,6 @@
 ;Program: Frequency Divider.src 
 ;This program permits MicroChip Pic 16c84 microcontrollers 
-;to act as frequency dividers, that ultimately drive stepper motors.
+;to act as frequency dividers, that then ultimately drive stepper motors.
 ;A Parallax Basic Stamp sends the divider percentage operand (0-100%);
 ;the PIC stores this value in EEPROM. No operand is available in EEPROM
 ;on the first boot. 
